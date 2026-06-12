@@ -71,7 +71,6 @@ export default function BottomControlBar({
                   className="box-border content-stretch flex gap-[6px] items-center justify-center px-[16px] py-[8px] relative rounded-[4px] shrink-0 cursor-pointer bg-[#00bf30] hover:bg-[#00a528] transition-colors"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.15 }}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
