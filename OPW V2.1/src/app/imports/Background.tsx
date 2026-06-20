@@ -7,7 +7,9 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../compon
 import { TmsDataPopover } from '../components/InfoPopovers';
 import { AuditLogDialog } from '../components/AuditLogDialog';
 import { useLibrary } from '../context/LibraryContext';
+import { useDocumentHoldsContext } from '../context/DocumentHoldsContext';
 import LoadNavigation, { LoadProvider, useLoad } from '../components/LoadNavigation';
+import { Settings } from 'lucide-react';
 
 function Circle() {
   return (
@@ -415,9 +417,19 @@ function Component187() {
 
 function FileData() {
   const [auditLogOpen, setAuditLogOpen] = useState(false);
+  const holdsContext = useDocumentHoldsContext();
 
   return (
     <>
+      {holdsContext && (
+        <div
+          className="box-border content-stretch flex gap-[8px] items-center justify-center px-0 py-[3px] relative rounded-[3px] shrink-0 size-[19px] cursor-pointer hover:bg-[#f0f0f0] transition-colors"
+          title="Manage Hold Reasons"
+          onClick={holdsContext.onOpenHoldReasonsSettings}
+        >
+          <Settings className="size-[14px] text-[#475467]" />
+        </div>
+      )}
       <div 
         className="box-border content-stretch flex gap-[8px] items-center justify-center px-0 py-[3px] relative rounded-[3px] shrink-0 size-[19px] cursor-pointer hover:bg-[#f0f0f0] transition-colors" 
         data-name="File data"
@@ -425,7 +437,11 @@ function FileData() {
       >
         <Component187 />
       </div>
-      <AuditLogDialog open={auditLogOpen} onOpenChange={setAuditLogOpen} />
+      <AuditLogDialog
+        open={auditLogOpen}
+        onOpenChange={setAuditLogOpen}
+        holdAuditLog={holdsContext?.holdAuditLog ?? []}
+      />
     </>
   );
 }

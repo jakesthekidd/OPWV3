@@ -5,6 +5,7 @@ import ValidationGrid, { ValidationField } from './ValidationGrid';
 import MissingDocumentsContainer, { MissingDocument } from './MissingDocumentsContainer';
 import { Document, DocumentType } from '../App';
 import svgPaths from '../imports/svg-yp1i5y3a7m';
+import type { DocumentHold, HoldReason, ManualHoldEntry } from '../types/documentHolds';
 
 interface ConsolidatedExceptionsViewProps {
   // Field Exceptions
@@ -26,6 +27,17 @@ interface ConsolidatedExceptionsViewProps {
   // Unclassified Documents
   documents: Document[];
   onDocumentClassification: (documentId: string, newType: DocumentType) => void;
+
+  // Document Holds
+  holdReasons?: HoldReason[];
+  getActiveHolds?: (section: string) => DocumentHold[];
+  getRemovedHolds?: (section: string) => DocumentHold[];
+  hasActiveHolds?: (section: string) => boolean;
+  getHoldIndicatorVariant?: (section: string) => 'none' | 'overridable' | 'locked';
+  canOverrideHold?: (section: string) => boolean;
+  getReasonLabel?: (reasonId: string) => string;
+  onPlaceManualHolds?: (section: string, entries: ManualHoldEntry[]) => void;
+  onOverrideHolds?: (section: string, holdIds: string[]) => void;
 }
 
 // Icon Components
@@ -505,6 +517,15 @@ export default function ConsolidatedExceptionsView(props: ConsolidatedExceptions
                     selectedDocumentId={props.selectedDocumentId}
                     onDocumentSelect={props.onDocumentSelect}
                     isEmbedded={true}
+                    holdReasons={props.holdReasons}
+                    getActiveHolds={props.getActiveHolds}
+                    getRemovedHolds={props.getRemovedHolds}
+                    hasActiveHolds={props.hasActiveHolds}
+                    getHoldIndicatorVariant={props.getHoldIndicatorVariant}
+                    canOverrideHold={props.canOverrideHold}
+                    getReasonLabel={props.getReasonLabel}
+                    onPlaceManualHolds={props.onPlaceManualHolds}
+                    onOverrideHolds={props.onOverrideHolds}
                   />
                 </motion.div>
               </AnimatePresence>

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import { CircleCheck, ArrowRight } from 'lucide-react';
+import { CircleCheck, ArrowRight, ShieldAlert } from 'lucide-react';
 import { motion } from 'motion/react';
 import svgPathsArrow from '../imports/svg-nfl9brerhj';
 import svgPathsException from '../imports/svg-0ir5gwhpdc';
+import type { HoldAuditEvent } from '../types/documentHolds';
 
 // Custom NotEqual icon component (≠ symbol) — same as ApprovedContainer
 function NotEqual({ className }: { className?: string }) {
@@ -198,7 +199,15 @@ function DocumentPanel({
 }
 
 // Main Audit Log Dialog Component
-export function AuditLogDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function AuditLogDialog({
+  open,
+  onOpenChange,
+  holdAuditLog = [],
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  holdAuditLog?: HoldAuditEvent[];
+}) {
   // Mock data matching the current screen state
   const auditDocuments = [
     {
@@ -309,6 +318,47 @@ export function AuditLogDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
         <ScrollArea className="max-h-[calc(80vh-80px)]">
           <div className="flex flex-col">
+            {holdAuditLog.length > 0 && (
+              <div className="border-b border-[#e5e7eb]">
+                <div className="px-[16px] py-[10px] bg-[#fffbeb] border-b border-[#fde68a] flex items-center gap-[8px]">
+                  <ShieldAlert className="size-[14px] text-[#B8860B]" />
+                  <p className="font-['Roboto:SemiBold',sans-serif] font-semibold text-[13px] text-[#92400e]">
+                    Hold Events ({holdAuditLog.length})
+                  </p>
+                </div>
+                {holdAuditLog.map((event) => (
+                  <div
+                    key={event.id}
+                    className="px-[16px] py-[10px] border-b border-[#f1f4f7] last:border-b-0 hover:bg-[#fafafa] transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-[12px]">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-['Roboto:Medium',sans-serif] font-medium text-[12px] text-[#1f2937]">
+                          {event.reasonLabel}
+                          <span className="text-[#8d9aae] font-normal"> · {event.documentSection}</span>
+                        </p>
+                        {event.details && (
+                          <p className="font-['Roboto:Regular',sans-serif] text-[11px] text-[#6b7280] mt-[2px]">
+                            {event.details}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-['Roboto:Regular',sans-serif] text-[10px] text-[#9ca3af] capitalize">
+                          {event.action.replace('_', ' ')}
+                        </p>
+                        <p className="font-['Roboto:Medium',sans-serif] font-medium text-[11px] text-[#374151]">
+                          {event.actor}
+                        </p>
+                        <p className="font-['Roboto:Regular',sans-serif] text-[10px] text-[#9ca3af]">
+                          {event.timestamp.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {auditDocuments.map((doc, index) => (
               <DocumentPanel key={index} {...doc} />
             ))}

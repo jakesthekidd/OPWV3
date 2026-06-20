@@ -3,6 +3,10 @@ import { Check, MoreVertical } from 'lucide-react';
 import svgPathsResting from '../imports/svg-egjw0lyglk';
 import svgPathsHover from '../imports/svg-hinwqmnjjh';
 import svgPathsSelected from '../imports/svg-vnyhshm0i9';
+import DocumentHoldTooltip from './holds/DocumentHoldTooltip';
+import OverriddenHoldTooltip from './holds/OverriddenHoldTooltip';
+import HoldIcon from './holds/HoldIcon';
+import type { DocumentHold, HoldIndicatorVariant, HoldReason } from '../types/documentHolds';
 
 interface DocumentTitleProps {
   documentName: string;
@@ -14,7 +18,14 @@ interface DocumentTitleProps {
   onCheckboxToggle?: (e: React.MouseEvent) => void;
   isCheckboxDisabled?: boolean;
   onContextMenu?: (e: React.MouseEvent) => void;
-  pageCount?: number; // Add page count prop
+  pageCount?: number;
+  holdVariant?: HoldIndicatorVariant;
+  activeHolds?: DocumentHold[];
+  removedHolds?: DocumentHold[];
+  holdReasons?: HoldReason[];
+  getReasonLabel?: (reasonId: string) => string;
+  onHoldIconClick?: () => void;
+  onOverriddenHoldIconClick?: () => void;
 }
 
 function RadioButtnAndCheckBox16({ isChecked, isDisabled, onClick }: { 
@@ -76,7 +87,14 @@ function Frame427322113({
   isChecked, 
   isCheckboxDisabled, 
   onCheckboxClick,
-  pageCount
+  pageCount,
+  holdVariant = 'none',
+  activeHolds = [],
+  removedHolds = [],
+  holdReasons = [],
+  getReasonLabel,
+  onHoldIconClick,
+  onOverriddenHoldIconClick,
 }: { 
   documentName: string; 
   isSelected: boolean; 
@@ -84,19 +102,53 @@ function Frame427322113({
   isCheckboxDisabled?: boolean;
   onCheckboxClick?: (e: React.MouseEvent) => void;
   pageCount?: number;
+  holdVariant?: HoldIndicatorVariant;
+  activeHolds?: DocumentHold[];
+  removedHolds?: DocumentHold[];
+  holdReasons?: HoldReason[];
+  getReasonLabel?: (reasonId: string) => string;
+  onHoldIconClick?: () => void;
+  onOverriddenHoldIconClick?: () => void;
 }) {
+  const reasonLabelFn = getReasonLabel ?? ((id: string) => id);
+  const hasActiveHolds = holdVariant !== 'none' && activeHolds.length > 0;
+  const hasRemovedHolds = removedHolds.length > 0;
+
   return (
     <div className="basis-0 content-stretch flex grow h-full items-center min-h-px min-w-px relative shrink-0">
-      <div className="box-border content-stretch flex gap-[10px] h-full items-center justify-center px-0 py-[10px] relative shrink-0 w-[67px]" data-name="Start">
+      <div className="box-border content-stretch flex gap-[6px] h-full items-center justify-center px-0 py-[10px] relative shrink-0 min-w-[67px] max-w-[96px]" data-name="Start">
         {isSelected && (
           <div aria-hidden="true" className="absolute border-[#72cdf4] border-[0px_0px_0px_4px] border-solid inset-0 pointer-events-none" />
         )}
-        <div className="content-stretch flex items-start relative shrink-0" data-name="Radio Buttn and Check Box  16">
-          <RadioButtnAndCheckBox16 
-            isChecked={isChecked} 
-            isDisabled={isCheckboxDisabled}
-            onClick={onCheckboxClick}
-          />
+        <div className="content-stretch flex items-center gap-[6px] relative shrink-0" data-name="Radio Buttn and Check Box  16">
+          {hasActiveHolds ? (
+            <DocumentHoldTooltip
+              variant={holdVariant}
+              holds={activeHolds}
+              holdReasons={holdReasons}
+              getReasonLabel={reasonLabelFn}
+              onClick={onHoldIconClick}
+            >
+              <HoldIcon
+                variant={holdVariant === 'locked' ? 'locked' : 'overridable'}
+                size={22}
+                count={activeHolds.length}
+              />
+            </DocumentHoldTooltip>
+          ) : (
+            <RadioButtnAndCheckBox16
+              isChecked={isChecked}
+              isDisabled={isCheckboxDisabled}
+              onClick={onCheckboxClick}
+            />
+          )}
+          {hasRemovedHolds && (
+            <OverriddenHoldTooltip
+              holds={removedHolds}
+              getReasonLabel={reasonLabelFn}
+              onClick={onOverriddenHoldIconClick}
+            />
+          )}
         </div>
       </div>
       <Frame427321822 documentName={documentName} isSelected={isSelected} pageCount={pageCount} />
@@ -114,7 +166,14 @@ export default function DocumentTitle({
   onCheckboxToggle,
   isCheckboxDisabled,
   onContextMenu,
-  pageCount
+  pageCount,
+  holdVariant = 'none',
+  activeHolds = [],
+  removedHolds = [],
+  holdReasons = [],
+  getReasonLabel,
+  onHoldIconClick,
+  onOverriddenHoldIconClick,
 }: DocumentTitleProps) {
   const [isHovered, setIsHovered] = useState(false);
   
@@ -150,6 +209,13 @@ export default function DocumentTitle({
               isCheckboxDisabled={isCheckboxDisabled}
               onCheckboxClick={handleCheckboxClick}
               pageCount={pageCount}
+              holdVariant={holdVariant}
+              activeHolds={activeHolds}
+              removedHolds={removedHolds}
+              holdReasons={holdReasons}
+              getReasonLabel={getReasonLabel}
+              onHoldIconClick={onHoldIconClick}
+              onOverriddenHoldIconClick={onOverriddenHoldIconClick}
             />
             {/* Exception Status - only show if not complete and has exceptions */}
             {!isComplete && exceptionCount > 0 && (

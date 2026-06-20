@@ -11,8 +11,10 @@ import { MessageCenterFab } from "./components/MessageCenterFab";
 import OnboardingTour from "./components/OnboardingTour";
 import { LibraryContext } from "./context/LibraryContext";
 import ComponentLibrary from "./components/library/ComponentLibrary";
+import { DocumentHoldsContext } from "./context/DocumentHoldsContext";
+import { useDocumentHolds } from "./hooks/useDocumentHolds";
 
-export type DocumentType = 
+export type DocumentType =
   | 'Invoice' 
   | 'Bill of Lading' 
   | 'Proof of Delivery' 
@@ -42,6 +44,51 @@ const initialMissingDocuments: MissingDocument[] = [
 ];
 
 const initialValidationData: ValidationField[] = [
+  // Invoice fields (demo document with active holds)
+  {
+    id: 'invoice-1',
+    fieldName: 'Total',
+    expectedValue: '$900',
+    evaluatedValue: '$900',
+    isRequired: true,
+    isResolved: true,
+    isIgnored: false,
+    section: 'Invoice',
+    additionalInfo: 'Range: $800 - $900',
+    isIgnorable: true
+  },
+  {
+    id: 'invoice-2',
+    fieldName: 'Carrier',
+    expectedValue: 'Swift Transportation',
+    evaluatedValue: 'Swift Transportation',
+    isRequired: true,
+    isResolved: true,
+    isIgnored: false,
+    section: 'Invoice'
+  },
+  {
+    id: 'invoice-3',
+    fieldName: 'Remit',
+    expectedValue: 'Express Funding LLC',
+    evaluatedValue: 'Express Funding',
+    isRequired: true,
+    isResolved: false,
+    isIgnored: false,
+    section: 'Invoice',
+    isIgnorable: true
+  },
+  {
+    id: 'invoice-4',
+    fieldName: 'Invoice Date',
+    expectedValue: '2024-11-01',
+    evaluatedValue: '2024-11-01',
+    isRequired: true,
+    isResolved: true,
+    isIgnored: false,
+    section: 'Invoice',
+    fieldType: 'date'
+  },
   // Initial validation data with fields from different documents
   {
     id: 'inv-1',
@@ -227,6 +274,7 @@ const initialValidationData: ValidationField[] = [
 
 export default function App() {
   const [showLibrary, setShowLibrary] = useState(false);
+  const [showHoldReasonsSettings, setShowHoldReasonsSettings] = useState(false);
   const [validationData, setValidationData] = useState<ValidationField[]>(initialValidationData);
   const [documents, setDocuments] = useState<Document[]>(initialDocuments);
   const [missingDocuments, setMissingDocuments] = useState<MissingDocument[]>(initialMissingDocuments);
@@ -289,6 +337,8 @@ export default function App() {
     }
   ]);
 
+  const holdsApi = useDocumentHolds({ documents, missingDocuments });
+
   const handleFieldUpdate = (id: string, updates: Partial<ValidationField>) => {
     setValidationData(prev => 
       prev.map(field => 
@@ -337,6 +387,13 @@ export default function App() {
   };
 
   const handleApprove = () => {
+    const blocked = Array.from(selectedSections).filter((section) =>
+      holdsApi.hasActiveHolds(section)
+    );
+    if (blocked.length > 0) {
+      toast.error(`Cannot approve — ${blocked.join(', ')} has active holds`);
+      return;
+    }
     if (selectedSections.size === 0) return;
 
     // Create approved documents from selected sections
@@ -622,6 +679,12 @@ export default function App() {
 
   return (
     <LibraryContext.Provider value={{ showLibrary, setShowLibrary }}>
+      <DocumentHoldsContext.Provider
+        value={{
+          holdAuditLog: holdsApi.holdAuditLog,
+          onOpenHoldReasonsSettings: () => setShowHoldReasonsSettings(true),
+        }}
+      >
       <Toaster 
         position="top-right" 
         richColors 
@@ -687,6 +750,26 @@ export default function App() {
                 onDocumentSelect={setSelectedDocumentId}
                 onActiveTabChange={setActiveTab}
                 onDocumentReject={handleDocumentReject}
+                holdReasons={holdsApi.holdReasons}
+                getActiveHolds={holdsApi.getActiveHolds}
+                getRemovedHolds={holdsApi.getRemovedHolds}
+                hasActiveHolds={holdsApi.hasActiveHolds}
+                getHoldIndicatorVariant={holdsApi.getHoldIndicatorVariant}
+                canOverrideHold={holdsApi.canOverride}
+                getReasonLabel={holdsApi.getReasonLabel}
+                onPlaceManualHolds={(section, entries) => {
+                  holdsApi.placeManualHolds(section, entries);
+                  setHasChanges(true);
+                }}
+                onOverrideHolds={(section, holdIds) => {
+                  holdsApi.overrideHolds(section, holdIds);
+                  setHasChanges(true);
+                }}
+                onAddHoldReason={holdsApi.addHoldReason}
+                onUpdateHoldReason={holdsApi.updateHoldReason}
+                onRetireHoldReason={holdsApi.retireHoldReason}
+                showHoldReasonsSettings={showHoldReasonsSettings}
+                onShowHoldReasonsSettingsChange={setShowHoldReasonsSettings}
               />
             </Resizable>
             <div className="flex-1 min-w-0 max-w-full overflow-hidden">
@@ -707,6 +790,7 @@ export default function App() {
           <OnboardingTour />
         </div>
       )}
+      </DocumentHoldsContext.Provider>
     </LibraryContext.Provider>
   );
 }

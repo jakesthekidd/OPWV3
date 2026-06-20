@@ -32,6 +32,8 @@ import {
 import ExceptionTabHeader from "../components/ExceptionTabHeader";
 import BottomControlBar from "../components/BottomControlBar";
 import ConsolidatedExceptionsView from "../components/ConsolidatedExceptionsView";
+import type { DocumentHold, HoldReason, ManualHoldEntry } from "../types/documentHolds";
+import ManageHoldReasonsSettings from "../components/holds/ManageHoldReasonsSettings";
 
 interface ValadationSectionProps {
   validationData: ValidationField[];
@@ -52,6 +54,21 @@ interface ValadationSectionProps {
   selectedDocumentId: string;
   onDocumentSelect: (documentId: string) => void;
   onActiveTabChange?: (tab: string) => void;
+  onDocumentReject?: (documentId: string, reason: string) => void;
+  holdReasons?: HoldReason[];
+  getActiveHolds?: (section: string) => DocumentHold[];
+  getRemovedHolds?: (section: string) => DocumentHold[];
+  hasActiveHolds?: (section: string) => boolean;
+  getHoldIndicatorVariant?: (section: string) => 'none' | 'overridable' | 'locked';
+  canOverrideHold?: (section: string) => boolean;
+  getReasonLabel?: (reasonId: string) => string;
+  onPlaceManualHolds?: (section: string, entries: ManualHoldEntry[]) => void;
+  onOverrideHolds?: (section: string, holdIds: string[]) => void;
+  onAddHoldReason?: (label: string) => void;
+  onUpdateHoldReason?: (id: string, label: string) => void;
+  onRetireHoldReason?: (id: string) => void;
+  showHoldReasonsSettings?: boolean;
+  onShowHoldReasonsSettingsChange?: (open: boolean) => void;
 }
 
 const DOCUMENT_TYPES: DocumentType[] = [
@@ -1577,12 +1594,21 @@ function AuditSection(props: ValadationSectionProps) {
   };
 
   const handleSaveAndApprove = () => {
-    // Save changes first, then approve
+    const blockedSections = Array.from(props.selectedSections).filter((section) =>
+      props.hasActiveHolds?.(section)
+    );
+    if (blockedSections.length > 0) {
+      return;
+    }
     if (props.onSave) {
       props.onSave();
     }
     props.onApprove();
   };
+
+  const approvableCount = Array.from(props.selectedSections).filter(
+    (section) => !props.hasActiveHolds?.(section)
+  ).length;
 
   return (
     <div className="basis-0 grow min-h-px min-w-px relative shrink-0 w-full" data-name="Audit section">
@@ -1618,6 +1644,15 @@ function AuditSection(props: ValadationSectionProps) {
                   onToggleMissingDocIgnore={props.onToggleMissingDocIgnore}
                   documents={props.documents}
                   onDocumentClassification={props.onDocumentClassification}
+                  holdReasons={props.holdReasons}
+                  getActiveHolds={props.getActiveHolds}
+                  getRemovedHolds={props.getRemovedHolds}
+                  hasActiveHolds={props.hasActiveHolds}
+                  getHoldIndicatorVariant={props.getHoldIndicatorVariant}
+                  canOverrideHold={props.canOverrideHold}
+                  getReasonLabel={props.getReasonLabel}
+                  onPlaceManualHolds={props.onPlaceManualHolds}
+                  onOverrideHolds={props.onOverrideHolds}
                 />
               </div>
             </TabsContent>
@@ -1643,8 +1678,17 @@ function AuditSection(props: ValadationSectionProps) {
             onSaveAndApprove={handleSaveAndApprove}
             onCancel={props.onRevertChanges}
             hasChanges={props.hasChanges}
-            canApprove={props.selectedSections.size > 0}
-            approveCount={props.selectedSections.size}
+            canApprove={approvableCount > 0}
+            approveCount={approvableCount}
+          />
+
+          <ManageHoldReasonsSettings
+            open={props.showHoldReasonsSettings ?? false}
+            onOpenChange={(open) => props.onShowHoldReasonsSettingsChange?.(open)}
+            holdReasons={props.holdReasons ?? []}
+            onAdd={(label) => props.onAddHoldReason?.(label)}
+            onUpdate={(id, label) => props.onUpdateHoldReason?.(id, label)}
+            onRetire={(id) => props.onRetireHoldReason?.(id)}
           />
         </div>
       </div>

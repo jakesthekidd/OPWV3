@@ -7,6 +7,11 @@ import { format } from 'date-fns';
 import { MoreVertical, File, CheckCircle2, AlertTriangle, AlertCircle, ArrowRight, Undo2, Calendar } from 'lucide-react';
 import DocumentContextMenu from './DocumentContextMenu';
 import DocumentTitle from './DocumentTitle';
+import AddDocumentHoldDialog from './holds/AddDocumentHoldDialog';
+import OverrideDocumentHoldDialog from './holds/OverrideDocumentHoldDialog';
+import OverriddenHoldsDialog from './holds/OverriddenHoldsDialog';
+import type { DocumentHold, HoldReason, ManualHoldEntry } from '../types/documentHolds';
+import { toast } from 'sonner';
 
 export interface ValidationField {
   id: string;
@@ -44,7 +49,16 @@ interface ValidationGridProps {
   approvedDocuments?: ApprovedDocument[];
   selectedDocumentId: string;
   onDocumentSelect: (documentId: string) => void;
-  isEmbedded?: boolean; // New prop to indicate if it's embedded in a larger container
+  isEmbedded?: boolean;
+  holdReasons?: HoldReason[];
+  getActiveHolds?: (section: string) => DocumentHold[];
+  getRemovedHolds?: (section: string) => DocumentHold[];
+  hasActiveHolds?: (section: string) => boolean;
+  getHoldIndicatorVariant?: (section: string) => 'none' | 'overridable' | 'locked';
+  canOverrideHold?: (section: string) => boolean;
+  getReasonLabel?: (reasonId: string) => string;
+  onPlaceManualHolds?: (section: string, entries: ManualHoldEntry[]) => void;
+  onOverrideHolds?: (section: string, holdIds: string[]) => void;
 }
 
 type ValidationStatus = 'resolved' | 'match' | 'within-range' | 'error' | 'warning' | 'ignored';
@@ -60,7 +74,16 @@ export default function ValidationGrid({
   approvedDocuments = [],
   selectedDocumentId,
   onDocumentSelect,
-  isEmbedded = false
+  isEmbedded = false,
+  holdReasons = [],
+  getActiveHolds = () => [],
+  getRemovedHolds = () => [],
+  hasActiveHolds = () => false,
+  getHoldIndicatorVariant = () => 'none' as const,
+  canOverrideHold = () => false,
+  getReasonLabel = (id) => id,
+  onPlaceManualHolds,
+  onOverrideHolds,
 }: ValidationGridProps) {
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [hoveredSection, setHoveredSection] = useState<string | null>(null);
@@ -83,9 +106,22 @@ export default function ValidationGrid({
     documentGroup: '',
   });
 
+  const [addHoldDialog, setAddHoldDialog] = useState<{ open: boolean; section: string }>({
+    open: false,
+    section: '',
+  });
+  const [overrideHoldDialog, setOverrideHoldDialog] = useState<{ open: boolean; section: string }>({
+    open: false,
+    section: '',
+  });
+  const [overriddenHoldsDialog, setOverriddenHoldsDialog] = useState<{ open: boolean; section: string }>({
+    open: false,
+    section: '',
+  });
+
   const getDocumentInfo = (section: string) => {
     const documentData: Record<string, { pageCount: number; isAvailable: boolean; hasFields: boolean; exceptionCount: number }> = {
-      'Invoice': { pageCount: 2, isAvailable: true, hasFields: true, exceptionCount: 2 },
+      'Invoice': { pageCount: 2, isAvailable: true, hasFields: true, exceptionCount: 1 },
       'Bill of Lading': { pageCount: 3, isAvailable: true, hasFields: true, exceptionCount: 2 },
       'Proof of Delivery': { pageCount: 5, isAvailable: true, hasFields: true, exceptionCount: 2 },
       'Fuel Receipt': { pageCount: 1, isAvailable: true, hasFields: true, exceptionCount: 1 },
@@ -225,7 +261,7 @@ export default function ValidationGrid({
       const wasComplete = previousCompletionState[section] || false;
       
       // Auto-check when a section transitions from incomplete to complete
-      if (isComplete && !wasComplete) {
+      if (isComplete && !wasComplete && !hasActiveHolds(section)) {
         newSelectedSections.add(section);
         hasChanges = true;
       }
@@ -250,7 +286,11 @@ export default function ValidationGrid({
 
   const handleCheckboxToggle = (section: string) => {
     const isComplete = isSectionComplete(section);
-    if (!isComplete) return; // Can't toggle if section has exceptions
+    if (!isComplete) return;
+    if (hasActiveHolds(section)) {
+      toast.error(`Cannot approve ${section} — active holds must be cleared first`);
+      return;
+    }
     
     const newSet = new Set(selectedSections);
     if (newSet.has(section)) {
@@ -329,7 +369,18 @@ export default function ValidationGrid({
                     e.stopPropagation();
                     handleCheckboxToggle(section);
                   }}
-                  isCheckboxDisabled={!sectionComplete}
+                  isCheckboxDisabled={!sectionComplete || hasActiveHolds(section)}
+                  holdVariant={getHoldIndicatorVariant(section)}
+                  activeHolds={getActiveHolds(section)}
+                  removedHolds={getRemovedHolds(section)}
+                  holdReasons={holdReasons}
+                  getReasonLabel={getReasonLabel}
+                  onHoldIconClick={() =>
+                    setOverrideHoldDialog({ open: true, section })
+                  }
+                  onOverriddenHoldIconClick={() =>
+                    setOverriddenHoldsDialog({ open: true, section })
+                  }
                   onContextMenu={(e) => {
                     e.stopPropagation();
                     const rect = e.currentTarget.getBoundingClientRect();
@@ -585,6 +636,42 @@ export default function ValidationGrid({
         documentId={contextMenu.documentId}
         documentName={contextMenu.documentName}
         documentGroup={contextMenu.documentGroup}
+        hasActiveHolds={hasActiveHolds(contextMenu.documentName)}
+        canOverrideHold={canOverrideHold(contextMenu.documentName)}
+        onPlaceHold={() =>
+          setAddHoldDialog({ open: true, section: contextMenu.documentName })
+        }
+        onOverrideHold={() =>
+          setOverrideHoldDialog({ open: true, section: contextMenu.documentName })
+        }
+        onAddHoldReason={() =>
+          setAddHoldDialog({ open: true, section: contextMenu.documentName })
+        }
+      />
+
+      <AddDocumentHoldDialog
+        open={addHoldDialog.open}
+        onOpenChange={(open) => setAddHoldDialog((prev) => ({ ...prev, open }))}
+        documentSection={addHoldDialog.section}
+        holdReasons={holdReasons}
+        onSubmit={(entries) => onPlaceManualHolds?.(addHoldDialog.section, entries)}
+      />
+
+      <OverrideDocumentHoldDialog
+        open={overrideHoldDialog.open}
+        onOpenChange={(open) => setOverrideHoldDialog((prev) => ({ ...prev, open }))}
+        documentSection={overrideHoldDialog.section}
+        holds={getActiveHolds(overrideHoldDialog.section)}
+        getReasonLabel={getReasonLabel}
+        onOverride={(holdIds) => onOverrideHolds?.(overrideHoldDialog.section, holdIds)}
+      />
+
+      <OverriddenHoldsDialog
+        open={overriddenHoldsDialog.open}
+        onOpenChange={(open) => setOverriddenHoldsDialog((prev) => ({ ...prev, open }))}
+        documentSection={overriddenHoldsDialog.section}
+        holds={getRemovedHolds(overriddenHoldsDialog.section)}
+        getReasonLabel={getReasonLabel}
       />
     </div>
   );

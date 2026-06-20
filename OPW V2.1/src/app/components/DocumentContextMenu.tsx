@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, Download, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { HoldIconSmall, PadlockIcon } from './holds/HoldIcon';
 
 interface DocumentContextMenuProps {
   isOpen: boolean;
@@ -14,7 +15,12 @@ interface DocumentContextMenuProps {
   onDownload?: () => void;
   onMoveToLoadId?: (loadId: string) => void;
   onReject?: (reason: string) => void;
-  existingDocumentTypes?: string[]; // Document types currently in the load
+  existingDocumentTypes?: string[];
+  hasActiveHolds?: boolean;
+  canOverrideHold?: boolean;
+  onPlaceHold?: () => void;
+  onOverrideHold?: () => void;
+  onAddHoldReason?: () => void;
 }
 
 export default function DocumentContextMenu({
@@ -29,6 +35,11 @@ export default function DocumentContextMenu({
   onMoveToLoadId,
   onReject,
   existingDocumentTypes,
+  hasActiveHolds = false,
+  canOverrideHold = false,
+  onPlaceHold,
+  onOverrideHold,
+  onAddHoldReason,
 }: DocumentContextMenuProps) {
   const [activeSubmenu, setActiveSubmenu] = useState<'type' | 'reject' | null>(null);
   const [loadIdSearch, setLoadIdSearch] = useState('');
@@ -65,6 +76,8 @@ export default function DocumentContextMenu({
   
   // Rejection reasons for submenu
   const rejectionReasons = ['Duplicate', 'Illegible', 'Other'];
+
+  const showHoldActions = documentGroup === 'validation';
 
   // Conditional visibility
   const showChangeDocumentType = documentGroup !== 'approved';
@@ -282,12 +295,52 @@ export default function DocumentContextMenu({
           <span>Download Documents</span>
         </button>
 
+        {/* Hold actions — validation grid only */}
+        {showHoldActions && !hasActiveHolds && (
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#475467] hover:bg-[#F5F7FA] hover:text-[#1A1F36] transition-colors"
+            onClick={() => {
+              onPlaceHold?.();
+              onClose();
+            }}
+          >
+            <HoldIconSmall className="opacity-70" />
+            <span>Place Document on Hold</span>
+          </button>
+        )}
+
+        {showHoldActions && hasActiveHolds && canOverrideHold && (
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#475467] hover:bg-[#F5F7FA] hover:text-[#1A1F36] transition-colors"
+            onClick={() => {
+              onOverrideHold?.();
+              onClose();
+            }}
+          >
+            <PadlockIcon />
+            <span>Override Document Hold</span>
+          </button>
+        )}
+
+        {showHoldActions && hasActiveHolds && (
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#475467] hover:bg-[#F5F7FA] hover:text-[#1A1F36] transition-colors"
+            onClick={() => {
+              onAddHoldReason?.();
+              onClose();
+            }}
+          >
+            <HoldIconSmall className="opacity-70" />
+            <span>Add Hold Reason</span>
+          </button>
+        )}
+
         {/* Divider */}
-        {showMoveToLoadId && (
+        {(showMoveToLoadId || showHoldActions) && (
           <div className="my-1 border-t border-[#E5E7EB]" />
         )}
 
-        {/* Move Document to Load ID */}
+        {/* Divider before move - removed duplicate */}
         {showMoveToLoadId && (
           <div className="px-3 py-2">
             <div className="relative">
