@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ValidationGrid, { ValidationField } from './ValidationGrid';
@@ -348,6 +348,15 @@ export default function ConsolidatedExceptionsView(props: ConsolidatedExceptions
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['field-exceptions'])
   );
+
+  useEffect(() => {
+    const expandForTour = () => {
+      setExpandedSections(new Set(['unclassified', 'missing', 'field-exceptions']));
+    };
+
+    window.addEventListener('opw-tour-start', expandForTour);
+    return () => window.removeEventListener('opw-tour-start', expandForTour);
+  }, []);
 
   const unclassifiedDocs = props.documents.filter(doc => doc.type === 'Unclassified');
   const fieldExceptionCount = props.validationData.filter(field =>

@@ -12,8 +12,42 @@ import { HelpCircle, X, ArrowLeft, ArrowRight, Check, Sparkles } from 'lucide-re
  * - Falls back to a centered card when a target isn't on screen.
  */
 
-const STORAGE_KEY = 'opw-onboarding-v1';
+const STORAGE_KEY = 'opw-onboarding-v2';
 const CARD_W = 348;
+const TOUR_START_EVENT = 'opw-tour-start';
+const TOUR_READY_ANCHORS = ['tabs', 'doc-sidebar', 'field-exceptions'];
+
+function hasCompletedTour(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === 'done';
+  } catch {
+    return false;
+  }
+}
+
+function waitForTourAnchors(maxMs = 4000): Promise<void> {
+  return new Promise((resolve) => {
+    const started = Date.now();
+
+    const check = () => {
+      const ready = TOUR_READY_ANCHORS.every((id) => {
+        const el = document.querySelector(`[data-tour="${id}"]`) as HTMLElement | null;
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+
+      if (ready || Date.now() - started >= maxMs) {
+        resolve();
+        return;
+      }
+
+      requestAnimationFrame(check);
+    };
+
+    requestAnimationFrame(check);
+  });
+}
 
 interface Step {
   selector?: string; // matches [data-tour="..."]; omit for a centered step
@@ -66,6 +100,21 @@ const STEPS: Step[] = [
   },
   {
     selector: 'save-bar',
+    getRect: () => {
+      const el = document.querySelector('[data-tour="save-bar"]') as HTMLElement | null;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
+        }
+      }
+      return {
+        top: window.innerHeight - 56,
+        left: 0,
+        width: window.innerWidth,
+        height: 56,
+      };
+    },
     title: 'Save & approve',
     body: "When a document’s fields are all clean, it’s ready. A bar appears at the bottom with **Save** (keep your progress) and **Save & Approve** (clear the document and send it onward).\n\nThat’s the whole loop — you’re ready to go! 🎉",
   },
@@ -103,23 +152,6 @@ export default function OnboardingTour() {
   const current = STEPS[step];
   const isLast = step === total - 1;
 
-  // Auto-launch on first visit only.
-  useEffect(() => {
-    let done = false;
-    try { done = localStorage.getItem(STORAGE_KEY) === 'done'; } catch { /* ignore */ }
-    if (!done) {
-      const t = setTimeout(() => { setStep(0); setIsOpen(true); }, 700);
-      return () => clearTimeout(t);
-    }
-  }, []);
-
-  const finish = useCallback(() => {
-    setIsOpen(false);
-    try { localStorage.setItem(STORAGE_KEY, 'done'); } catch { /* ignore */ }
-  }, []);
-
-  const start = useCallback(() => { setStep(0); setIsOpen(true); }, []);
-
   const measure = useCallback(() => {
     const def = STEPS[step];
     if (def?.getRect) { setTargetRect(def.getRect()); return; }
@@ -132,6 +164,42 @@ export default function OnboardingTour() {
     setTargetRect({ top: r.top, left: r.left, width: r.width, height: r.height });
   }, [step]);
 
+  const openTour = useCallback((fromAutoLaunch = false) => {
+    setStep(0);
+    setIsOpen(true);
+    if (fromAutoLaunch) {
+      window.dispatchEvent(new CustomEvent(TOUR_START_EVENT));
+    }
+  }, []);
+
+  const finish = useCallback(() => {
+    setIsOpen(false);
+    try { localStorage.setItem(STORAGE_KEY, 'done'); } catch { /* ignore */ }
+  }, []);
+
+  const start = useCallback(() => {
+    openTour(false);
+  }, [openTour]);
+
+  // Auto-launch on first visit once the workspace UI is painted.
+  useEffect(() => {
+    if (hasCompletedTour()) return;
+
+    let cancelled = false;
+
+    const launch = async () => {
+      await waitForTourAnchors();
+      if (cancelled || hasCompletedTour()) return;
+      openTour(true);
+    };
+
+    launch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [openTour]);
+
   // On step change: scroll the target into view, then measure (re-measure to catch scroll/expand animations).
   useEffect(() => {
     if (!isOpen) return;
@@ -143,8 +211,17 @@ export default function OnboardingTour() {
     measure();
     const t1 = setTimeout(measure, 220);
     const t2 = setTimeout(measure, 480);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    const t3 = setTimeout(measure, 900);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [isOpen, step, measure]);
+
+  // Initial measure when the tour opens so the welcome card is positioned immediately.
+  useEffect(() => {
+    if (!isOpen) return;
+    measure();
+    const t = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(t);
+  }, [isOpen, measure]);
 
   // Keep aligned on resize / scroll.
   useEffect(() => {
